@@ -27,6 +27,7 @@ module Proxy::Ansible
         @passphrase = action_input['secrets']['key_passphrase']
         @execution_timeout_interval = action_input[:execution_timeout_interval]
         @cleanup_working_dirs = action_input.fetch(:cleanup_working_dirs, true)
+        @vault_password_file = action_input[:vault_password_file]
       end
 
       def start
@@ -192,7 +193,7 @@ module Proxy::Ansible
         env['FOREMAN_CALLBACK_DISABLE'] = '1' if @rex_command
         env['SMART_PROXY_ANSIBLE_ENVIRONMENT_FILE'] = Proxy::Ansible::Plugin.settings[:ansible_environment_file]
         command = ['ansible-runner', 'run', @root, '-p', 'playbook.yml']
-        command << '--cmdline' << cmdline unless cmdline.nil?
+        command << "--cmdline='#{cmdline}'" unless cmdline.nil?
         command << verbosity if verbose?
 
         initialize_command(env, ENVIRONMENT_WRAPPER, *command)
@@ -200,7 +201,7 @@ module Proxy::Ansible
       end
 
       def cmdline
-        cmd_args = [tags_cmd, check_cmd].reject(&:empty?)
+        cmd_args = [vault_cmd, tags_cmd, check_cmd].reject(&:empty?)
         return nil unless cmd_args.any?
         cmd_args.join(' ')
       end
@@ -212,6 +213,10 @@ module Proxy::Ansible
 
       def check_cmd
         check_mode? ? '"--check"' : ''
+      end
+
+      def vault_cmd
+        @vault_password_file.present? ? "--vault-password-file='#{@vault_password_file}'" : nil
       end
 
       def verbosity
